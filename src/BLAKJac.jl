@@ -22,6 +22,7 @@ include("analysis.jl")
 include("defaults.jl")
 include("interfaceOptToAn.jl")
 include("optimize.jl")
+include("utils.jl")
 
 # Plotting functions: If PyPlot is available in the environment from which BLAKJac is loaded, then PyPlot-based plotting functions are loaded. Otherwise nothing is plotted.
 # Users can define their own plotting functions and load them in the same way as PyPlot is loaded.

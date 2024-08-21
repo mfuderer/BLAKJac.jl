@@ -56,62 +56,62 @@ A dictionary of H matrix arrays (labeled by combination of T1T2-probing index an
 - `useSurrogate`  should be false by default; if true, it uses a polynomial estimate of signal and derivatives, rather than the actual EPG estimate
 - `useSymmetry`   if true, it is assumed that the phase of proton density is very smooth, such that, for BLAKJac analysis, all output can be considerd to be real
 """
+function BLAKJac_analysis!(
+    resource::CPU1, 
+    RFdeg::Vector{<:Complex}, 
+    trajectorySet::Vector{<:Vector{<:TrajectoryElement}}, 
+    options::Dict, 
+    saved_H::Dict=Dict()
+    )
 
-function BLAKJac_analysis!(resource::CPU1, RFdeg::Vector{ComplexF64}, trajectorySet::Vector{Vector{TrajectoryElement}}, options::Dict, saved_H::Dict=Dict())
-
-    RFrad = RFdeg * (π / 180)
-    TR::Float64 = options["TR"]
-    TE = TR / 2.01
-    TI = (options["startstate"] == 1) ? 20.0 : 0.01
-    T1ref::Float64 = options["T1ref"]
-    T2ref::Float64 = options["T2ref"]
-    maxstate::Int64 = options["maxstate"]
-    useSurrogate::Bool = options["useSurrogate"]
+    # Extract the test values for T1 and T2 from the options dictionary
     T1T2set::Vector{Tuple{Float64,Float64}} = options["T1T2set"]
-    cyclic::Bool = options["considerCyclic"]
+    
+    # Check whether B1 is to be considered as a nuisance parameter
+    nNuisances = _calculate_num_nuisance_parameters(options)
 
-    nPars = 3
-    considerB1nuisance = false
-    if (options["handleB1"] == "sensitivity") || (options["handleB1"] == "co-reconstruct")
-        considerB1nuisance = true
-    end
-    nNuisances = (considerB1nuisance && !useSurrogate) ? 1 : 0
+    # Assemble SPGR sequence simulator (FISP3D) 
+    sequence = _assemble_FISP3D(options, RFdeg)
 
-    # plot simulated sequence if requested
-    plotOn = (length(options["plottypes"]) > 0)
-    if plotOn
-        options["plotfuncs"]["close"]()
-    end
-    if any(i -> i == "first", options["plottypes"])
-        options["plotfuncs"]["first"](RFdeg, trajectorySet, options)
-    end
-    if any(i -> i == "trajectories", options["plottypes"])
-        options["plotfuncs"]["trajectories"](trajectorySet)
-    end
+    # Plot RF train and trajectory (if supported plotting backend is available)
+    _plot_sequence(options, RFdeg, trajectorySet)
 
-    # Assemble SPGR sequence simulator
-    # RFdegExtended = repeat(RFdeg,outer=(cyclic ? 2 : 1))
+    # Estimate the noise levels, information content and B1 sensitivity factor
+    B1_coupling_factors, noise_values, information_content = BLAKJacOnT1T2set(T1T2set, resource, sequence, trajectorySet, options, saved_H, nNuisances)
 
-    # additional parameter required for 3D simulations
-    T_wait = 0.0 # 50.0# 0.0# 1.75 
-    N_repeat = cyclic ? 5 : 1
-    bINV = options["startstate"] < 0
-    py_undersampling_factor = 1
-    spgr = BlochSimulators.FISP3D(RFdeg, TR, TE, maxstate, TI, T_wait, N_repeat, bINV, false, py_undersampling_factor)
+    # Calculate the CSF penalty, if any
+    CSF_penalty = _calculate_csf_penalty(options, sequence, T1T2set)
+
+    # Plot noise levels (if supported plotting backend is available)
+    _plot_noise_levels(options, RFdeg, trajectorySet, noise_values)
+
+    return noise_values, information_content, B1_coupling_factors, CSF_penalty
+end
+
+"""
+    BLAKJacOnT1T2set(T1T2set, resource, sequence, trajectorySet, options, saved_H, nNuisances)
+
+Predicts noise levels, information content and B1 coupling factors for a given combination of RF pattern (that is contained with `sequence`) and phase encoding pattern (`trajectorySet`). 
+
+Whereas `BLAKJacOnSingleT1T2` uses a single pair of T₁ and T₂ values, `BLAKJacOnT1T2set` bases the predictions on a set of T₁ and T₂ values.
+"""
+function BLAKJacOnT1T2set(T1T2set, resource, sequence, trajectorySet, options, saved_H, nNuisances)
 
     # Initialize accumulators to calculate averaged result over the T1T2set
+    nPars = 3 # rho, T1, T2
     b1factors2All = zeros(nPars)
     noisesAll = zeros(nPars)
     b1factorsLast = zeros(nPars)
     ItotAll = 0.0
 
-    # Loop over all (e.g. 7) probe-values of (T1,T2)
+    # Loop over all probe-values of (T1,T2)
     for (index, (T1test, T2test)) in enumerate(T1T2set)
         B1test = 1.0
 
-        H, noises, Itot, b1factors = BLAKJacOnSingleT1T2(resource, T1test, T2test, B1test, nNuisances, spgr, trajectorySet, options)
+        # Calculate noise levels, information content and B1 sensitivity factor
+        H, noises, Itot, b1factors = BLAKJacOnSingleT1T2(resource, T1test, T2test, B1test, nNuisances, sequence, trajectorySet, options)
 
-        # accumulate
+        # Accumulate results
         b1factors2All .+= (b1factors) .^ 2
         b1factorsLast = b1factors
         noisesAll .+= noises
@@ -122,51 +122,19 @@ function BLAKJac_analysis!(resource::CPU1, RFdeg::Vector{ComplexF64}, trajectory
         end
     end #for loop over probe-set of (T1,T2)
 
-    # ------------------------------------- estimate of value for CSF_penalty
-    if get(options, "lambda_CSF", 0.0) > 0.0
-        T₁T₂_csf = T₁T₂(4.0, 2.0)
-        echos_csf = BlochSimulators.simulate_magnetization(spgr, T₁T₂_csf)
-
-        echos_tissue = zeros(ComplexF64, size(echos_csf))
-        for (index, (T1test, T2test)) in enumerate(T1T2set)
-            T₁T₂_tissue = T₁T₂(T1test, T2test)
-            echos_tissue .+= BlochSimulators.simulate_magnetization(spgr, T₁T₂_tissue)
-        end
-        CSF_penalty = norm(echos_csf) / (norm(echos_tissue) / length(T1T2set))
-
-        # following vlock was intended for debugging, but the graph is nice enough to keep it        
-        i = options["optcount"]
-        emergeCriterion = options["opt_emergeCriterion"] # (1*1000^3) ÷ (length(RFdegC)^2)
-        emerge = (i % emergeCriterion == 2)
-        if emerge
-            Main.PyPlot.figure()
-            Main.PyPlot.plot(abs.(echos_csf))
-            for (index, (T1test, T2test)) in enumerate(T1T2set)
-                T₁T₂_tissue_one = T₁T₂(T1test, T2test)
-                echos_tissue_one = BlochSimulators.simulate_magnetization(spgr, T₁T₂_tissue_one)
-                Main.PyPlot.plot(abs.(echos_tissue_one))
-            end
-            Main.PyPlot.pause(0.1)
-        end
-        # end of debug part
-
-
-    else
-        CSF_penalty = 0.0
-    end
-
     b1factorsRms = length(T1T2set) == 1 ? b1factorsLast : sqrt.(b1factors2All ./ size(T1T2set))
     noisesAll ./= size(T1T2set)
     ItotAll /= only(size(T1T2set))
 
-    if any(i -> i == "noisebars", options["plottypes"])
-        options["plotfuncs"]["bars"](RFrad, trajectorySet, noisesAll)
-    end
-
-    return noisesAll, ItotAll, b1factorsRms, CSF_penalty
+    return b1factorsRms, noisesAll, ItotAll
 end
 
-function BLAKJacOnSingleT1T2(resource::CPU1, T1test, T2test, B1test, nNuisances, spgr::BlochSimulators.FISP3D, trajectorySet::Vector{Vector{TrajectoryElement}}, options::Dict)
+"""
+    BLAKJacOnSingleT1T2(resource::CPU1, T1test, T2test, B1test, nNuisances, spgr::BlochSimulators.FISP3D, trajectorySet::Vector{Vector{TrajectoryElement}}, options::Dict)
+
+Predicts noise levels, information content and B1 coupling factors for a given combination of RF pattern (that is contained with `sequence`) and phase encoding pattern (`trajectorySet`) using a **single pair** of T₁ and T₂ values. 
+"""
+function BLAKJacOnSingleT1T2(resource::CPU1, T1test, T2test, B1test, nNuisances, spgr::BlochSimulators.FISP3D, trajectorySet::Vector{<:Vector{<:TrajectoryElement}}, options::Dict)
     TR = options["TR"]
     nTR = length(trajectorySet)
     nky = options["nky"]
