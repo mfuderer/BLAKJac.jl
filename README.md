@@ -87,7 +87,7 @@ The list of options:
 | T1ref | Float | 0.67 | The reference T1 value - by now, mainly used for noise scaling and for "relative" noise deviations |
 | T2ref | Float | 0.076 | The reference T2 value - by now, mainly used for noise scaling and for "relative" noise deviations |
 | **startstate** | Float | 1.0 | Although it is formally a float, it acts like a Boolean: it indicates the starting state of the z-magnetisation; +1 for no prepulse, -1 for inversion |
-| maxstate | Int | 40 |  Length of history taken into account in simulating magnetisation from sequence |
+| maxstate | Int | 64 |  Length of history taken into account in simulating magnetisation from sequence |
 | nky | Int | Derived from range of ky values in trajectorySet | Length of range of ky encoding values. |
 | nkz | Int | Derived from range of kz values in trajectorySet | Length of range of kz encoding values. So nTR/nky/nkz is number of samples per encoding. | 
 | maxMeas | Int | Filled in as 4*nTR/(nky*nkz) | (R1) (see remarks below) |

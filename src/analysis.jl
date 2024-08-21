@@ -96,7 +96,8 @@ function BLAKJac_analysis!(resource::CPU1, RFdeg::Vector{ComplexF64}, trajectory
     T_wait = 0.0 # 50.0# 0.0# 1.75 
     N_repeat = cyclic ? 5 : 1
     bINV = options["startstate"] < 0
-    spgr = BlochSimulators.FISP3D(RFdeg, TR, TE, maxstate, TI, T_wait, N_repeat, bINV)
+    py_undersampling_factor = 1
+    spgr = BlochSimulators.FISP3D(RFdeg, TR, TE, maxstate, TI, T_wait, N_repeat, bINV, false, py_undersampling_factor)
 
     # Initialize accumulators to calculate averaged result over the T1T2set
     b1factors2All = zeros(nPars)
@@ -123,13 +124,13 @@ function BLAKJac_analysis!(resource::CPU1, RFdeg::Vector{ComplexF64}, trajectory
 
     # ------------------------------------- estimate of value for CSF_penalty
     if get(options, "lambda_CSF", 0.0) > 0.0
-        parameters = BlochSimulators.T₁T₂(4.0, 2.0)
-        echos_csf = BlochSimulators.simulate_magnetization(cpu, spgr, [parameters])
+        T₁T₂_csf = T₁T₂(4.0, 2.0)
+        echos_csf = BlochSimulators.simulate_magnetization(spgr, T₁T₂_csf)
 
         echos_tissue = zeros(ComplexF64, size(echos_csf))
         for (index, (T1test, T2test)) in enumerate(T1T2set)
-            parameters = BlochSimulators.T₁T₂(T1test, T2test)
-            echos_tissue .+= BlochSimulators.simulate_magnetization(cpu, spgr, [parameters])
+            T₁T₂_tissue = T₁T₂(T1test, T2test)
+            echos_tissue .+= BlochSimulators.simulate_magnetization(spgr, T₁T₂_tissue)
         end
         CSF_penalty = norm(echos_csf) / (norm(echos_tissue) / length(T1T2set))
 
@@ -141,8 +142,8 @@ function BLAKJac_analysis!(resource::CPU1, RFdeg::Vector{ComplexF64}, trajectory
             Main.PyPlot.figure()
             Main.PyPlot.plot(abs.(echos_csf))
             for (index, (T1test, T2test)) in enumerate(T1T2set)
-                parameters = BlochSimulators.T₁T₂(T1test, T2test)
-                echos_tissue_one = BlochSimulators.simulate_magnetization(cpu, spgr, [parameters])
+                T₁T₂_tissue_one = T₁T₂(T1test, T2test)
+                echos_tissue_one = BlochSimulators.simulate_magnetization(sequence, T₁T₂_tissue_one)
                 Main.PyPlot.plot(abs.(echos_tissue_one))
             end
             Main.PyPlot.pause(0.1)
@@ -182,29 +183,31 @@ function BLAKJacOnSingleT1T2(resource::CPU1, T1test, T2test, B1test, nNuisances,
     note = @sprintf("for (T1,T2)=(%6.1f,%6.1f)", 1000 * T1test, 1000 * T2test)
     takeB1asVariable = (options["handleB1"] == "co-reconstruct")
 
-    parameters = (nNuisances > 0) ? [BlochSimulators.T₁T₂B₁(T1test, T2test, B1test)] : [BlochSimulators.T₁T₂(T1test, T2test)]
-    fit_parameters = (nNuisances > 0) ? ∂mˣʸ∂T₁T₂B₁ : ∂mˣʸ∂T₁T₂
+    parameters = (nNuisances > 0) ? T₁T₂B₁(T1test, T2test, B1test) : T₁T₂(T1test, T2test)
+    parameters = StructVector([parameters])
+    fit_parameters = (nNuisances > 0) ? (:T₁, :T₂, :B₁) : (:T₁, :T₂)
 
     # Now an inelegant if-then-else approach follows,
     # prompted by not fully understanding the struct that is returned by simulate_derivatives() ...
     wlocal = zeros(ComplexF64, nTR, nPars + nNuisances)
 
     if (useSurrogate)
-        surrogate = BlochSimulators.PolynomialSurrogate(spgr, options)
-        derivs = simulate_derivatives(resource, surrogate, parameters, fit_parameters)
-        wlocal[:, 1] = derivs.m
-        wlocal[:, 2] = derivs.∂T₁
-        wlocal[:, 3] = derivs.∂T₂
+        error("Surrogate model not supported at the moment")
+        # surrogate = BlochSimulators.PolynomialSurrogate(spgr, options)
+        # derivs = simulate_derivatives(resource, surrogate, parameters, fit_parameters)
+        # wlocal[:, 1] = derivs.m
+        # wlocal[:, 2] = derivs.∂T₁
+        # wlocal[:, 3] = derivs.∂T₂
     else
-        m = simulate_magnetization(resource, spgr, parameters)
-        mdm = simulate_derivatives(m, resource, spgr, parameters, fit_parameters)
-        echos = [m for (m, ∂m) in mdm]
-        derivs = [∂m for (m, ∂m) in mdm] |> StructArray
-        wlocal[:, 1] = echos
-        wlocal[:, 2] = derivs.∂T₁ .* T1test
-        wlocal[:, 3] = derivs.∂T₂ .* T2test
+
+        m = simulate_magnetization(spgr, parameters)
+        ∂m = simulate_derivatives_finite_difference(fit_parameters, m, spgr, parameters)
+
+        wlocal[:, 1] = m
+        wlocal[:, 2] = ∂m.T₁ .* T1test
+        wlocal[:, 3] = ∂m.T₂ .* T2test
         if nNuisances > 0
-            wlocal[:, 4] = derivs.∂B₁
+            wlocal[:, 4] = ∂m.B₁
         end
     end
 
@@ -361,19 +364,17 @@ function BLAKJacOnSingleT1T2(resource::CPU1, T1test, T2test, B1test, nNuisances,
                 # between the two B1 values).
                 b1midway = (B1metric == "multi_point_values") ? (1.0 + b1) / 2.0 : b1
                 parameters = [BlochSimulators.T₁T₂B₁(T1test, T2test, b1midway)]
-                m = simulate_magnetization(resource, spgr, parameters)
-                mdm = simulate_derivatives(m, resource, spgr, parameters, fit_parameters)
-                echos = [m for (m, ∂m) in mdm]
-                derivs = [∂m for (m, ∂m) in mdm] |> StructArray
-                wlocal[:, 1] = echos
-                wlocal[:, 2] = derivs.∂T₁ .* T1test
-                wlocal[:, 3] = derivs.∂T₂ .* T2test
-                wlocal[:, 4] = derivs.∂B₁
+                m = simulate_magnetization(spgr, parameters)
+                ∂m = simulate_derivatives_finite_difference(fit_parameters, m, spgr, parameters)
+                wlocal[:, 1] = m
+                wlocal[:, 2] = ∂m.T₁ .* T1test
+                wlocal[:, 3] = ∂m.T₂ .* T2test
+                wlocal[:, 4] = ∂m.B₁
                 if (B1metric == "multi_point_values")
-                    parameters_ideal = [BlochSimulators.T₁T₂B₁(T1test, T2test, 1.0)]
-                    parameters_b1 = [BlochSimulators.T₁T₂B₁(T1test, T2test, b1)]
-                    m_ideal = simulate_magnetization(resource, spgr, parameters_ideal)
-                    m_b1 = simulate_magnetization(resource, spgr, parameters_b1)
+                    parameters_ideal = T₁T₂B₁(T1test, T2test, 1.0)
+                    parameters_b1 = T₁T₂B₁(T1test, T2test, b1)
+                    m_ideal = simulate_magnetization(spgr, parameters_ideal)
+                    m_b1 = simulate_magnetization(spgr, parameters_b1)
                     wlocal[:, 4] = m_b1 .- m_ideal
                 end
 

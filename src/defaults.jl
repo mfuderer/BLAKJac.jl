@@ -37,7 +37,7 @@ function BLAKJac_defaults!(trajectorySet::Vector{Vector{TrajectoryElement}}, opt
     conFill!(options, "T1ref", 0.67)           # The reference T1 value - by now, mainly used for noise scaling and for "relative" noise deviations
     conFill!(options, "T2ref", 0.076)
     conFill!(options, "startstate", 1.0)       # Starting state of the z-magnetisation; +1 for no prepulse, -1 for inversion
-    conFill!(options, "maxstate", 40)          # Length of history taken into account in simulating magnetisation from sequence
+    conFill!(options, "maxstate", 64)          # Length of history taken into account in simulating magnetisation from sequence
     vnky = nky(trajectorySet)
     conFill!(options, "nky", vnky)             # Number of different encoding values simulated; nTR/nky/nkz is number of samples per encoding    
     vnkz = nkz(trajectorySet)
