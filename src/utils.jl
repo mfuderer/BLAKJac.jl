@@ -14,10 +14,10 @@ function _plot_sequence(options, RFdeg, trajectorySet)
     if plotOn
         options["plotfuncs"]["close"]()
     end
-    if any(isequal("first"), options["plottypes"])
+    if "first" ∈ options["plottypes"]
         options["plotfuncs"]["first"](RFdeg, trajectorySet, options)
     end
-    if any(isequal("trajectories"), options["plottypes"])
+    if "trajectories" ∈ options["plottypes"]
         options["plotfuncs"]["trajectories"](trajectorySet)
     end
 end
@@ -90,7 +90,7 @@ function _plot_noise_levels(options, RFdeg, trajectorySet, noisesAll)
 
     RFrad = RFdeg * (π / 180)
 
-    if any(i -> i == "noisebars", options["plottypes"])
+    if haskey(options["plotfuncs"], "noisebars")
         options["plotfuncs"]["bars"](RFrad, trajectorySet, noisesAll)
     end
 end

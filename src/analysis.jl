@@ -173,7 +173,7 @@ function BLAKJacOnSingleT1T2(T1test, T2test, B1test, nNuisances, spgr::BlochSimu
         end
     end
 
-    if any(i -> i == "weights", options["plottypes"]) # if "weights" in keys(options["plottypes"])
+    if "weights" ∈ options["plottypes"]
         kz = [(s)[1].kz for s in trajectorySet]
         ky = [(s)[1].ky for s in trajectorySet]
         #hue = 8*kz; 
@@ -181,7 +181,7 @@ function BLAKJacOnSingleT1T2(T1test, T2test, B1test, nNuisances, spgr::BlochSimu
         options["plotfuncs"]["weighting"](wlocal[:, 1], wlocal[:, 2], wlocal[:, 3], hue, note)
     end
 
-    if any(i -> i == "original_jacobian", options["plottypes"])
+    if "original_jacobian" ∈ options["plottypes"]
         options["plotfuncs"]["originaljacobian"](wlocal[:, 1], wlocal[:, 2], wlocal[:, 3], note, options)
     end
     # plotFuncs["jacobian"]()
@@ -384,7 +384,7 @@ function BLAKJacOnSingleT1T2(T1test, T2test, B1test, nNuisances, spgr::BlochSimu
     end
 
     # output diagonal elements
-    if any(i -> i == "noiseSpectrum", options["plottypes"])
+    if "noiseSpectrum" ∈ options["plottypes"]
         options["plotfuncs"]["noisespectrum"](H, nes2, note, options)
     end
 
@@ -416,7 +416,8 @@ function BLAKJacOnSingleT1T2(T1test, T2test, B1test, nNuisances, spgr::BlochSimu
             I[k, 1, :] = log.(ps ./ pn .+ 1.0)
         end
     end
-    if any(i -> i == "infocon", options["plottypes"])
+
+    if "infocon" ∈ options["plottypes"]
         options["plotfuncs"]["infocon"](I, note)
     end
 
