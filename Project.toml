@@ -1,7 +1,7 @@
 name = "BLAKJac"
 uuid = "71791924-b903-4d6d-b97e-d26ae20ee392"
 authors = ["m.fuderer@umcutrecht.nl"]
-version = "0.1"
+version = "0.1.1"
 
 [deps]
 BlochSimulators = "2c9a3a5d-4a8d-4ca7-a6c9-04a38836deab"
