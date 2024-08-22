@@ -143,7 +143,7 @@ function BLAKJac_analysis!(resource::CPU1, RFdeg::Vector{ComplexF64}, trajectory
             Main.PyPlot.plot(abs.(echos_csf))
             for (index, (T1test, T2test)) in enumerate(T1T2set)
                 T₁T₂_tissue_one = T₁T₂(T1test, T2test)
-                echos_tissue_one = BlochSimulators.simulate_magnetization(sequence, T₁T₂_tissue_one)
+                echos_tissue_one = BlochSimulators.simulate_magnetization(spgr, T₁T₂_tissue_one)
                 Main.PyPlot.plot(abs.(echos_tissue_one))
             end
             Main.PyPlot.pause(0.1)
