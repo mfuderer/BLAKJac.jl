@@ -1,3 +1,13 @@
+# "conditional conjugation"
+function CondConj(cond::Bool, f::Complex)
+    cf = cond ? conj(f) : f
+    return cf
+end
+function CondConj(cond::Bool, f::Vector{<:Complex})
+    cf = cond ? conj.(f) : f
+    return cf
+end
+
 function _plot_sequence(options, RFdeg, trajectorySet)
 
     plotOn = (length(options["plottypes"]) > 0)

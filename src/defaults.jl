@@ -1,26 +1,11 @@
 # Introduced 2022-07-14
 # Serves to fill in meaningful defaults for the options needed for BLAKJac optimization
-
-function nTR(trajectorySet::Vector{<:Vector{<:TrajectoryElement}})
-    return length(trajectorySet)
-end
-
-function nky(trajectorySet::Vector{<:Vector{<:TrajectoryElement}})
-    ky = [s[i].ky for s in trajectorySet for i in 1:length(s)]
-    return round(Int64, maximum(ky) - minimum(ky) + 1.0)
-end
-function nkz(trajectorySet::Vector{<:Vector{<:TrajectoryElement}})
-    kz = [s[i].kz for s in trajectorySet for i in 1:length(s)]
-    return round(Int64, maximum(kz) - minimum(kz) + 1.0)
-end
-
-
 """
     BLAKJac_defaults!(trajectorySet::Vector{Vector{TrajectoryElement}}, options::Dict)
 
-Initializes the elements of the dictionary 'options' (if not already filled in) to meaningful default values.
-
-it requires a trajectorySet as input (see TrajectorySet()), which defines the number of profiles (nTR) as well as the ky and kz ranges.
+Initializes the elements of the dictionary 'options' (if not already filled in) to meaningful default values. 
+    
+A trajectorySet is required as input (see the `TrajectorySet` function), which defines the number of profiles (nTR) as well as the ky and kz ranges.
 """
 function BLAKJac_defaults!(trajectorySet::Vector{<:Vector{<:TrajectoryElement}}, options::Dict)
     get!(options, "rfFile", "")            # name of the file to read the RF shape from

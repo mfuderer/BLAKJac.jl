@@ -1,3 +1,8 @@
+"""
+    struct TrajectoryElement{T<:Real}
+
+Representing a profile of a trajectory with certain `ky` and `kz` indices.
+"""
 struct TrajectoryElement{T<:Real}
     ky::T
     kz::T
@@ -17,15 +22,15 @@ function TrajectorySet(ky::Vector{T}, kz::Vector{T}) where T<:Real
     @assert length(ky) == length(kz)
     # some tricky logic follows: if any of the provided vectors shows negative values, it is assumed that the k-space center 
     # corresponds to the zero-value of input; if the input is nonnegative, it is assumed that it is symmetric around k=0
-    ky = to_signed_k_range(ky)
-    kz = to_signed_k_range(kz)
+    ky = _to_signed_k_range(ky)
+    kz = _to_signed_k_range(kz)
 
     trajectorySet = [[TrajectoryElement(ky[i], kz[i])] for i in 1:length(ky)]
 
     return trajectorySet
 end
 
-function to_signed_k_range(k::Vector{<:Real})
+function _to_signed_k_range(k::Vector{<:Real})
     # Don't do anything if already 'signed'
     (minimum(k) < 0) && return k
     # Calcalate the 'unsigned' center value
@@ -34,12 +39,32 @@ function to_signed_k_range(k::Vector{<:Real})
     return k .- ck
 end
 
-# "conditional conjugation"
-function CondConj(cond::Bool, f::Complex)
-    cf = cond ? conj(f) : f
-    return cf
+"""
+    nTR(trajectorySet::Vector{<:Vector{<:TrajectoryElement}})
+
+Extracts the number of profiles from the trajectorySet.
+"""
+function nTR(trajectorySet::Vector{<:Vector{<:TrajectoryElement}})
+    return length(trajectorySet)
 end
-function CondConj(cond::Bool, f::Vector{<:Complex})
-    cf = cond ? conj.(f) : f
-    return cf
+
+"""
+    nky(trajectorySet::Vector{<:Vector{<:TrajectoryElement}})
+
+Extracts the number of ky values per k-space from the trajectorySet. Assumes that the outer ky values are part of trajectorySet.
+"""
+function nky(trajectorySet::Vector{<:Vector{<:TrajectoryElement}})
+    ky = [s[i].ky for s in trajectorySet for i in 1:length(s)]
+    return round(Int64, maximum(ky) - minimum(ky) + 1.0)
 end
+
+"""
+    nkz(trajectorySet::Vector{<:Vector{<:TrajectoryElement}})
+
+Extracts the number of kz values per k-space from the trajectorySet. Assumes that the outer kz values are part of trajectorySet.
+"""
+function nkz(trajectorySet::Vector{<:Vector{<:TrajectoryElement}})
+    kz = [s[i].kz for s in trajectorySet for i in 1:length(s)]
+    return round(Int64, maximum(kz) - minimum(kz) + 1.0)
+end
+
