@@ -104,8 +104,7 @@ function BLAKJac_criterion(RFdegC::Vector{ComplexF64}, trajectorySet::Vector{Vec
 
     # --------------------------------------------------
     # Analyze the sequence
-    cpu = ComputationalResources.CPU1()
-    noises, infocon, b1s, CSF_penalty = BLAKJac_analysis!(cpu, RFdegC, trajectorySet, options)
+    noises, infocon, b1s, CSF_penalty = BLAKJac_analysis!(RFdegC, trajectorySet, options)
 
     # --------------------------------------------------
     # Select the criterion value ("out") given the options

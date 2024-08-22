@@ -2,7 +2,6 @@ module BLAKJac
 
 # Load external packages
 using BlochSimulators
-using ComputationalResources
 using CUDA
 using DelimitedFiles
 using Distributed
@@ -28,8 +27,6 @@ include("utils.jl")
 # Users can define their own plotting functions and load them in the same way as PyPlot is loaded.
 include("../plot/set_plotfuncs.jl")
 include("../plot/pyplot.jl")
-
-cpu = ComputationalResources.CPU1()
 
 export BLAKJac_analysis!, BLAKJac_criterion, WrappedLowResOptimize, WrappedPortionOptimize
 export BLAKJac_optimize, BLAKJac_defaults!, TrajectorySet, PlotAmplAndPhaseDeriv

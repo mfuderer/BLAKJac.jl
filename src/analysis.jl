@@ -1,6 +1,6 @@
 
 """
-BLAKJac_analysis!(resource::CPU1, RFdeg::Vector{ComplexF64}, trajectorySet::Vector{Vector{TrajectoryElement}}, options::Dict, saved_H::Dict=Dict())
+BLAKJac_analysis!(RFdeg::Vector{ComplexF64}, trajectorySet::Vector{Vector{TrajectoryElement}}, options::Dict, saved_H::Dict=Dict())
 
 BLAKJac_Analysis! predicts noise levels, given an RF pattern and a phase encoding pattern.
 
@@ -57,7 +57,6 @@ A dictionary of H matrix arrays (labeled by combination of T1T2-probing index an
 - `useSymmetry`   if true, it is assumed that the phase of proton density is very smooth, such that, for BLAKJac analysis, all output can be considerd to be real
 """
 function BLAKJac_analysis!(
-    resource::CPU1, 
     RFdeg::Vector{<:Complex}, 
     trajectorySet::Vector{<:Vector{<:TrajectoryElement}}, 
     options::Dict, 
@@ -77,7 +76,7 @@ function BLAKJac_analysis!(
     _plot_sequence(options, RFdeg, trajectorySet)
 
     # Estimate the noise levels, information content and B1 sensitivity factor
-    B1_coupling_factors, noise_values, information_content = BLAKJacOnT1T2set(T1T2set, resource, sequence, trajectorySet, options, saved_H, nNuisances)
+    B1_coupling_factors, noise_values, information_content = BLAKJacOnT1T2set(T1T2set, sequence, trajectorySet, options, saved_H, nNuisances)
 
     # Calculate the CSF penalty, if any
     CSF_penalty = _calculate_csf_penalty(options, sequence, T1T2set)
@@ -89,13 +88,13 @@ function BLAKJac_analysis!(
 end
 
 """
-    BLAKJacOnT1T2set(T1T2set, resource, sequence, trajectorySet, options, saved_H, nNuisances)
+    BLAKJacOnT1T2set(T1T2set, sequence, trajectorySet, options, saved_H, nNuisances)
 
 Predicts noise levels, information content and B1 coupling factors for a given combination of RF pattern (that is contained with `sequence`) and phase encoding pattern (`trajectorySet`). 
 
 Whereas `BLAKJacOnSingleT1T2` uses a single pair of T₁ and T₂ values, `BLAKJacOnT1T2set` bases the predictions on a set of T₁ and T₂ values.
 """
-function BLAKJacOnT1T2set(T1T2set, resource, sequence, trajectorySet, options, saved_H, nNuisances)
+function BLAKJacOnT1T2set(T1T2set, sequence, trajectorySet, options, saved_H, nNuisances)
 
     # Initialize accumulators to calculate averaged result over the T1T2set
     nPars = 3 # rho, T1, T2
@@ -109,7 +108,7 @@ function BLAKJacOnT1T2set(T1T2set, resource, sequence, trajectorySet, options, s
         B1test = 1.0
 
         # Calculate noise levels, information content and B1 sensitivity factor
-        H, noises, Itot, b1factors = BLAKJacOnSingleT1T2(resource, T1test, T2test, B1test, nNuisances, sequence, trajectorySet, options)
+        H, noises, Itot, b1factors = BLAKJacOnSingleT1T2(T1test, T2test, B1test, nNuisances, sequence, trajectorySet, options)
 
         # Accumulate results
         b1factors2All .+= (b1factors) .^ 2
@@ -130,11 +129,11 @@ function BLAKJacOnT1T2set(T1T2set, resource, sequence, trajectorySet, options, s
 end
 
 """
-    BLAKJacOnSingleT1T2(resource::CPU1, T1test, T2test, B1test, nNuisances, spgr::BlochSimulators.FISP3D, trajectorySet::Vector{Vector{TrajectoryElement}}, options::Dict)
+    BLAKJacOnSingleT1T2(T1test, T2test, B1test, nNuisances, spgr::BlochSimulators.FISP3D, trajectorySet::Vector{Vector{TrajectoryElement}}, options::Dict)
 
 Predicts noise levels, information content and B1 coupling factors for a given combination of RF pattern (that is contained with `sequence`) and phase encoding pattern (`trajectorySet`) using a **single pair** of T₁ and T₂ values. 
 """
-function BLAKJacOnSingleT1T2(resource::CPU1, T1test, T2test, B1test, nNuisances, spgr::BlochSimulators.FISP3D, trajectorySet::Vector{<:Vector{<:TrajectoryElement}}, options::Dict)
+function BLAKJacOnSingleT1T2(T1test, T2test, B1test, nNuisances, spgr::BlochSimulators.FISP3D, trajectorySet::Vector{<:Vector{<:TrajectoryElement}}, options::Dict)
     TR = options["TR"]
     nTR = length(trajectorySet)
     nky = options["nky"]
@@ -161,11 +160,6 @@ function BLAKJacOnSingleT1T2(resource::CPU1, T1test, T2test, B1test, nNuisances,
 
     if (useSurrogate)
         error("Surrogate model not supported at the moment")
-        # surrogate = BlochSimulators.PolynomialSurrogate(spgr, options)
-        # derivs = simulate_derivatives(resource, surrogate, parameters, fit_parameters)
-        # wlocal[:, 1] = derivs.m
-        # wlocal[:, 2] = derivs.∂T₁
-        # wlocal[:, 3] = derivs.∂T₂
     else
 
         m = simulate_magnetization(spgr, parameters)

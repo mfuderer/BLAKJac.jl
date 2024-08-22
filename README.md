@@ -17,8 +17,7 @@ In essence, the analyzer has as its input
 * The *trajectorySet*. See dedicated section below.
 * A large bunch of options, in the form of a dictionary. For details, see BLAKJac_analysis and BLAKJac_defaults
 
-There are two additional parameters:
-* The resource: what type of processor is available;
+There is one additional parameter:
 * [Actually an output] Optionally, a dictionary of $I^{-1}$ matrices, where $I$ is the diagonalized Fisher Information Matrix. Such a dictionary may be useful if the optimizer is run a multiplicity of times.
 
 As an *Output*, the Analyzer returns
@@ -32,7 +31,6 @@ The interface, in full:
 
 ```julia
 function BLAKJac_analysis!(
-    resource::CPU1, 
     RFdeg::Vector{ComplexF64}, 
     trajectorySet::Vector{Vector{TrajectoryElement}}, 
     options::Dict, 
