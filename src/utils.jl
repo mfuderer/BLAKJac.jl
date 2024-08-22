@@ -22,6 +22,28 @@ function _plot_sequence(options, RFdeg, trajectorySet)
     end
 end
 
+function _plot_weights(options, trajectorySet, wlocal)
+    if "weights" ∈ options["plottypes"] # if "weights" in keys(options["plottypes"])
+        kz = [(s)[1].kz for s in trajectorySet]
+        ky = [(s)[1].ky for s in trajectorySet]
+        #hue = 8*kz; 
+        hue = ky
+        options["plotfuncs"]["weighting"](wlocal[:, 1], wlocal[:, 2], wlocal[:, 3], hue, note)
+    end
+end
+
+function _plot_original_jacobian(options, wlocal)
+    if "original_jacobian" ∈ options["plottypes"]
+        options["plotfuncs"]["originaljacobian"](wlocal[:, 1], wlocal[:, 2], wlocal[:, 3], note, options)
+    end
+end
+
+function _plot_noise_spectrum(H, nes2, note, options)
+    if "noiseSpectrum" ∈ options["plottypes"]
+        options["plotfuncs"]["noisespectrum"](H, nes2, note, options)
+    end
+end
+
 function _assemble_FISP3D(options, RFdeg)
 
     # TODO: This should be removed form BLAKJac: BLAKJac should work for any simulator and it is not the responsibility of BLAKJac to assemble the sequence)
