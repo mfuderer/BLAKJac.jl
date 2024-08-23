@@ -81,7 +81,8 @@ function BLAKJac_optimize(trajectorySet, options::Dict, mersenneTwisterSeed=1)
 
             @show time() - startTime
             @show res
-            Main.PyPlot.pause(2.0)
+            # Main.PyPlot.pause(2.0)
+            sleep(2.0)
         end
         # interpolate short RF array to full length
         RFdeg = ExpandRF(RFoldPDD, nTR, options)
