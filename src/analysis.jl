@@ -88,6 +88,19 @@ function BLAKJac_analysis!(
 end
 
 """
+In previous versions of BLAKJac, a `resource` argument was required. In the current version it is removed because it was not used in the function. For backwards-compatability purposes, we allow BLAKJac_analysis! to be called with the `resource` argument. 
+"""
+function BLAKJac_analysis!(resource,
+    RFdeg::Vector{<:Complex}, 
+    trajectorySet::Vector{<:Vector{<:TrajectoryElement}}, 
+    options::Dict, 
+    saved_H::Dict=Dict()
+    )
+
+    BLAKJac_analysis!(RFdeg, trajectorySet, options, saved_H)
+end
+
+"""
     BLAKJacOnT1T2set(T1T2set, sequence, trajectorySet, options, saved_H, nNuisances)
 
 Predicts noise levels, information content and B1 coupling factors for a given combination of RF pattern (that is contained with `sequence`) and phase encoding pattern (`trajectorySet`). 
