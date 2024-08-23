@@ -30,14 +30,14 @@ function ConvertConcatenatedFloatToCpx(RF::Vector{Float64})
 end
 
 # Interface between (A) an optimizer that wants to optimize on a limited set FLOAT of values and (B) an analyzer that expects a full-length COMPLEX array
-function ExpandCpxAndAnalyze(RF::Vector{Float64}, trajectorySet::Vector{<:Vector{<:TrajectoryElement}}, options::Dict)
+function ExpandCpxAndAnalyze(RF::Vector{Float64}, sequence::BlochSimulator, trajectorySet::Vector{<:Vector{<:TrajectoryElement}}, options::Dict)
     # convert array of floats into complex
     RFC = ConvertConcatenatedFloatToCpx(RF) # Combine float-array of double length into omplex array
-    return ExpandAndAnalyze(RFC, trajectorySet, options)
+    return ExpandAndAnalyze(RFC, sequence, trajectorySet, options)
 end
 
 # Interface between (A) an optimizer that wants to optimize on a limited set of values and (B) an analyzer that expects a full-length array
-function ExpandAndAnalyze(RFshortPDD::Array, trajectorySet::Vector{<:Vector{<:TrajectoryElement}}, options::Dict)
+function ExpandAndAnalyze(RFshortPDD::Array, sequence::BlochSimulator, trajectorySet::Vector{<:Vector{<:TrajectoryElement}}, options::Dict)
     # interpolate short RF array to full length
     nTR = length(trajectorySet)
     RFdeg = ExpandRF(RFshortPDD, nTR, options)
@@ -48,23 +48,33 @@ function ExpandAndAnalyze(RFshortPDD::Array, trajectorySet::Vector{<:Vector{<:Tr
     else
         # no activity; supposed be cpx by output of ExpandRF 
     end
-    penalty = BLAKJac_criterion(RFdeg, trajectorySet, options)
+
+    # Insert the RF train into the sequence object
+    _set_RF_train!(sequence, RFdeg)
+
+    # Calculate the penalty that we aim to minimize
+    penalty = BLAKJac_criterion(sequence, trajectorySet, options)
+
     return penalty
 end
 
 
 # Interfaces between (A) an optimizer that only wants to optimize on a FLOAT portion of a vector and (B) an analyzer that considers the full COMPLEX length
-function PlugInCpxAndAnalyze(RFpart::Vector{Float64}, portionRange, RFdeg::Vector{ComplexF64}, trajectorySet::Vector{<:Vector{<:TrajectoryElement}}, options::Dict)
+function PlugInCpxAndAnalyze(RFpart::Vector{Float64}, portionRange, RFdeg::Vector{ComplexF64}, sequence::BlochSimulator, trajectorySet::Vector{<:Vector{<:TrajectoryElement}}, options::Dict)
     RFC = ConvertConcatenatedFloatToCpx(RFpart) # Combine float-array of double length into omplex array
-    return PlugInAndAnalyze(RFC, portionRange, RFdeg, trajectorySet, options)
+    return PlugInAndAnalyze(RFC, portionRange, RFdeg, sequence, trajectorySet, options)
 end
 
 # Interfaces between (A) an optimizer that only wants to optimize on a portion of a vector and (B) an analyzer that considers the full length
-function PlugInAndAnalyze(RFpart::Vector{T}, portionRange, RFdeg::Vector{T}, trajectorySet::Vector{<:Vector{<:TrajectoryElement}}, options::Dict) where {T}
+function PlugInAndAnalyze(RFpart::Vector{T}, portionRange, RFdeg::Vector{T}, sequence::BlochSimulator, trajectorySet::Vector{<:Vector{<:TrajectoryElement}}, options::Dict) where {T}
     # plug the part into the full array
     RFdeg[portionRange] = RFpart
     RFdegC = complex(RFdeg)
-    penalty = BLAKJac_criterion(RFdegC, trajectorySet, options)
+
+    # Insert the RF train into the sequence object
+    _set_RF_train!(sequence, RFdegC)
+
+    penalty = BLAKJac_criterion(sequence, trajectorySet, options)
     return penalty
 end
 
@@ -100,11 +110,15 @@ end
 
 # For a given complex vector of RF angles and a trajectory, it outputs a criterion value, according to the selected option.
 # It may also, conditionally, plot an output
-function BLAKJac_criterion(RFdegC::Vector{ComplexF64}, trajectorySet::Vector{<:Vector{<:TrajectoryElement}}, options::Dict)
+function BLAKJac_criterion(sequence::BlochSimulator, trajectorySet::Vector{<:Vector{<:TrajectoryElement}}, options::Dict)
 
+    
     # --------------------------------------------------
     # Analyze the sequence
-    noises, infocon, b1s, CSF_penalty = BLAKJac_analysis!(RFdegC, trajectorySet, options)
+    noises, infocon, b1s, CSF_penalty = BLAKJac_analysis!(sequence, trajectorySet, options)
+    
+    # Extrat the RF train from the sequence object  
+    RFdegC = sequence.RF_train
 
     # --------------------------------------------------
     # Select the criterion value ("out") given the options
@@ -207,42 +221,39 @@ end
 
 # Interfaces between (A) an outside world that wants to see a potentially complex array optimized using specific options
 #                and (B) an optimizer that only wants to see a function accepting a float array and nothing else
-function WrappedPortionOptimize(RFpart::Vector{ComplexF64}, portionRange, RFdeg::Vector{ComplexF64}, trajectorySet::Vector{<:Vector{<:TrajectoryElement}}, options::Dict)
+function WrappedPortionOptimize(RFpart::Vector{ComplexF64}, portionRange, RFdeg::Vector{ComplexF64}, sequence::BlochSimulator, trajectorySet::Vector{<:Vector{<:TrajectoryElement}}, options::Dict)
     RFfloat = ConvertCpxToConcatenatedFloat(RFpart)
     opt_method = options["opt_method"]
     optpars = options["optpars"]
 
-    PlugInCpxAndAnalyze_(y) = PlugInCpxAndAnalyze(y, portionRange, RFdeg, trajectorySet, options)
+    PlugInCpxAndAnalyze_(y) = PlugInCpxAndAnalyze(y, portionRange, RFdeg, sequence, trajectorySet, options)
     res = optimize(PlugInCpxAndAnalyze_, RFfloat, opt_method(), optpars)
     RFportion = ConvertConcatenatedFloatToCpx(Optim.minimizer(res))
     return res, RFportion
 end
 
-function WrappedPortionOptimize(RFpart::Vector{Float64}, portionRange, RFdeg::Vector{Float64}, trajectorySet::Vector{<:Vector{<:TrajectoryElement}}, options::Dict)
+function WrappedPortionOptimize(RFpart::Vector{Float64}, portionRange, RFdeg::Vector{Float64}, sequence::BlochSimulator, trajectorySet::Vector{<:Vector{<:TrajectoryElement}}, options::Dict)
     opt_method = options["opt_method"]
     optpars = options["optpars"]
-    PlugInAndAnalyze_(y) = PlugInAndAnalyze(y, portionRange, RFdeg, trajectorySet, options)
+    PlugInAndAnalyze_(y) = PlugInAndAnalyze(y, portionRange, RFdeg, sequence, trajectorySet, options)
     res = optimize(PlugInAndAnalyze_, RFpart, opt_method(), optpars)
     return res, Optim.minimizer(res)
 end
 
-function WrappedLowResOptimize(RFshort::Vector{ComplexF64}, trajectorySet::Vector{<:Vector{<:TrajectoryElement}}, options::Dict)
+function WrappedLowResOptimize(RFshort::Vector{ComplexF64}, sequence::BlochSimulator, trajectorySet::Vector{<:Vector{<:TrajectoryElement}}, options::Dict)
     RFfloat = ConvertCpxToConcatenatedFloat(RFshort) # Split complex array into float-array of double length
     opt_method = options["opt_method"]
     optpars = options["optpars"]
-    ExpandCpxAndAnalyze_(RF) = ExpandCpxAndAnalyze(RF, trajectorySet, options)
+    ExpandCpxAndAnalyze_(RF) = ExpandCpxAndAnalyze(RF, sequence, trajectorySet, options)
     res = optimize(ExpandCpxAndAnalyze_, RFfloat, opt_method(), optpars)
     RFold = ConvertConcatenatedFloatToCpx(Optim.minimizer(res))
     return res, RFold
 end
 
-function WrappedLowResOptimize(RFshortPDD::Array{Float64}, trajectorySet::Vector{<:Vector{<:TrajectoryElement}}, options::Dict)
+function WrappedLowResOptimize(RFshortPDD::Array{Float64}, sequence::BlochSimulator, trajectorySet::Vector{<:Vector{<:TrajectoryElement}}, options::Dict)
     opt_method = options["opt_method"]
     optpars = options["optpars"]
-    ExpandAndAnalyze_(y) = ExpandAndAnalyze(y, trajectorySet, options)
+    ExpandAndAnalyze_(y) = ExpandAndAnalyze(y, sequence, trajectorySet, options)
     res = optimize(ExpandAndAnalyze_, RFshortPDD, opt_method(), optpars)
     return res, Optim.minimizer(res)
 end
-
-
-

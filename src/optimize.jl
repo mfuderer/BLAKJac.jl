@@ -49,7 +49,8 @@ Option parameters are:
   - `opt_method`      optimizer function, e.g. NelderMead
   - `optpars`         optimization parameters - see Optim package.
 """
-function BLAKJac_optimize(trajectorySet, options::Dict, mersenneTwisterSeed=1)
+function BLAKJac_optimize(sequence::BlochSimulator, trajectorySet, options::Dict, mersenneTwisterSeed=1)
+
     rSeed = MersenneTwister(mersenneTwisterSeed)
 
     nTR = length(trajectorySet)
@@ -77,7 +78,7 @@ function BLAKJac_optimize(trajectorySet, options::Dict, mersenneTwisterSeed=1)
             options["stage_text"] = "first phase, size is $thisSize"
             RFshortPDD = IncreaseResolution(RFoldPDD, thisSize)
 
-            res, RFoldPDD = BLAKJac.WrappedLowResOptimize(RFshortPDD, trajectorySet, options)
+            res, RFoldPDD = BLAKJac.WrappedLowResOptimize(RFshortPDD, sequence, trajectorySet, options)
 
             @show time() - startTime
             @show res
@@ -93,26 +94,40 @@ function BLAKJac_optimize(trajectorySet, options::Dict, mersenneTwisterSeed=1)
     # Second stage: optimize on successive portions of the sequence
     portionStart = 1
     iterCount = firstPhase + 1
+    @show cutShort
     while ((portionStart <= nTR) && (iterCount <= cutShort) && (options["opt_slow_phase"] == false))
+
+        println("Second stage, portion: $portionStart")
+
         portionEnd = min(nTR, portionStart + portionSize - 1)
         portionRange = portionStart:portionEnd
         options["stage_text"] = "second phase, considered range is $portionRange"
 
         RFpart = RFdeg[portionRange]
-        res, RFportion = BLAKJac.WrappedPortionOptimize(RFpart, portionRange, RFdeg, trajectorySet, options)
+        res, RFportion = BLAKJac.WrappedPortionOptimize(RFpart, portionRange, RFdeg, sequence, trajectorySet, options)
         RFdeg[portionRange] = RFportion
 
         FoldToBaseRange!(RFdeg)
 
         @show time() - startTime
         @show res
-        pause(2.0)
+        sleep(2.0)
 
         portionStart += portionStep
         iterCount += 1
     end
 
     return RFdeg # ,RFold
+end
+
+"""
+If no sequence is provided, BLAKJac uses FISP3D by default, using sequence parameters as specified in the `options` dictionary.
+""" 
+function BLAKJac_optimize(trajectorySet, options::Dict, mersenneTwisterSeed=1)
+
+    sequence = _assemble_FISP3D(options)
+
+    return BLAKJac_optimize(sequence, trajectorySet, options, mersenneTwisterSeed)
 end
 
 # Generate start pattern for the optimization process according to the options
