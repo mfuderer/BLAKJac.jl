@@ -30,14 +30,14 @@ function ConvertConcatenatedFloatToCpx(RF::Vector{Float64})
 end
 
 # Interface between (A) an optimizer that wants to optimize on a limited set FLOAT of values and (B) an analyzer that expects a full-length COMPLEX array
-function ExpandCpxAndAnalyze(RF::Vector{Float64}, trajectorySet::Vector{Vector{TrajectoryElement}}, options::Dict)
+function ExpandCpxAndAnalyze(RF::Vector{Float64}, trajectorySet::Vector{<:Vector{<:TrajectoryElement}}, options::Dict)
     # convert array of floats into complex
     RFC = ConvertConcatenatedFloatToCpx(RF) # Combine float-array of double length into omplex array
     return ExpandAndAnalyze(RFC, trajectorySet, options)
 end
 
 # Interface between (A) an optimizer that wants to optimize on a limited set of values and (B) an analyzer that expects a full-length array
-function ExpandAndAnalyze(RFshortPDD::Array, trajectorySet::Vector{Vector{TrajectoryElement}}, options::Dict)
+function ExpandAndAnalyze(RFshortPDD::Array, trajectorySet::Vector{<:Vector{<:TrajectoryElement}}, options::Dict)
     # interpolate short RF array to full length
     nTR = length(trajectorySet)
     RFdeg = ExpandRF(RFshortPDD, nTR, options)
@@ -54,13 +54,13 @@ end
 
 
 # Interfaces between (A) an optimizer that only wants to optimize on a FLOAT portion of a vector and (B) an analyzer that considers the full COMPLEX length
-function PlugInCpxAndAnalyze(RFpart::Vector{Float64}, portionRange, RFdeg::Vector{ComplexF64}, trajectorySet::Vector{Vector{TrajectoryElement}}, options::Dict)
+function PlugInCpxAndAnalyze(RFpart::Vector{Float64}, portionRange, RFdeg::Vector{ComplexF64}, trajectorySet::Vector{<:Vector{<:TrajectoryElement}}, options::Dict)
     RFC = ConvertConcatenatedFloatToCpx(RFpart) # Combine float-array of double length into omplex array
     return PlugInAndAnalyze(RFC, portionRange, RFdeg, trajectorySet, options)
 end
 
 # Interfaces between (A) an optimizer that only wants to optimize on a portion of a vector and (B) an analyzer that considers the full length
-function PlugInAndAnalyze(RFpart::Vector{T}, portionRange, RFdeg::Vector{T}, trajectorySet::Vector{Vector{TrajectoryElement}}, options::Dict) where {T}
+function PlugInAndAnalyze(RFpart::Vector{T}, portionRange, RFdeg::Vector{T}, trajectorySet::Vector{<:Vector{<:TrajectoryElement}}, options::Dict) where {T}
     # plug the part into the full array
     RFdeg[portionRange] = RFpart
     RFdegC = complex(RFdeg)
@@ -100,12 +100,11 @@ end
 
 # For a given complex vector of RF angles and a trajectory, it outputs a criterion value, according to the selected option.
 # It may also, conditionally, plot an output
-function BLAKJac_criterion(RFdegC::Vector{ComplexF64}, trajectorySet::Vector{Vector{TrajectoryElement}}, options::Dict)
+function BLAKJac_criterion(RFdegC::Vector{ComplexF64}, trajectorySet::Vector{<:Vector{<:TrajectoryElement}}, options::Dict)
 
     # --------------------------------------------------
     # Analyze the sequence
-    cpu = ComputationalResources.CPU1()
-    noises, infocon, b1s, CSF_penalty = BLAKJac_analysis!(cpu, RFdegC, trajectorySet, options)
+    noises, infocon, b1s, CSF_penalty = BLAKJac_analysis!(RFdegC, trajectorySet, options)
 
     # --------------------------------------------------
     # Select the criterion value ("out") given the options
@@ -208,7 +207,7 @@ end
 
 # Interfaces between (A) an outside world that wants to see a potentially complex array optimized using specific options
 #                and (B) an optimizer that only wants to see a function accepting a float array and nothing else
-function WrappedPortionOptimize(RFpart::Vector{ComplexF64}, portionRange, RFdeg::Vector{ComplexF64}, trajectorySet::Vector{Vector{TrajectoryElement}}, options::Dict)
+function WrappedPortionOptimize(RFpart::Vector{ComplexF64}, portionRange, RFdeg::Vector{ComplexF64}, trajectorySet::Vector{<:Vector{<:TrajectoryElement}}, options::Dict)
     RFfloat = ConvertCpxToConcatenatedFloat(RFpart)
     opt_method = options["opt_method"]
     optpars = options["optpars"]
@@ -219,7 +218,7 @@ function WrappedPortionOptimize(RFpart::Vector{ComplexF64}, portionRange, RFdeg:
     return res, RFportion
 end
 
-function WrappedPortionOptimize(RFpart::Vector{Float64}, portionRange, RFdeg::Vector{Float64}, trajectorySet::Vector{Vector{TrajectoryElement}}, options::Dict)
+function WrappedPortionOptimize(RFpart::Vector{Float64}, portionRange, RFdeg::Vector{Float64}, trajectorySet::Vector{<:Vector{<:TrajectoryElement}}, options::Dict)
     opt_method = options["opt_method"]
     optpars = options["optpars"]
     PlugInAndAnalyze_(y) = PlugInAndAnalyze(y, portionRange, RFdeg, trajectorySet, options)
@@ -227,7 +226,7 @@ function WrappedPortionOptimize(RFpart::Vector{Float64}, portionRange, RFdeg::Ve
     return res, Optim.minimizer(res)
 end
 
-function WrappedLowResOptimize(RFshort::Vector{ComplexF64}, trajectorySet::Vector{Vector{TrajectoryElement}}, options::Dict)
+function WrappedLowResOptimize(RFshort::Vector{ComplexF64}, trajectorySet::Vector{<:Vector{<:TrajectoryElement}}, options::Dict)
     RFfloat = ConvertCpxToConcatenatedFloat(RFshort) # Split complex array into float-array of double length
     opt_method = options["opt_method"]
     optpars = options["optpars"]
@@ -237,7 +236,7 @@ function WrappedLowResOptimize(RFshort::Vector{ComplexF64}, trajectorySet::Vecto
     return res, RFold
 end
 
-function WrappedLowResOptimize(RFshortPDD::Array{Float64}, trajectorySet::Vector{Vector{TrajectoryElement}}, options::Dict)
+function WrappedLowResOptimize(RFshortPDD::Array{Float64}, trajectorySet::Vector{<:Vector{<:TrajectoryElement}}, options::Dict)
     opt_method = options["opt_method"]
     optpars = options["optpars"]
     ExpandAndAnalyze_(y) = ExpandAndAnalyze(y, trajectorySet, options)
