@@ -4,7 +4,7 @@ end
 
 # plot of RF alongside with first elements of each trajectory
 # intended for Cartesian measurements, neglecting kx ... so single-point
-function PlotFirst(RFdeg::Vector{ComplexF64}, trajectorySet::Vector{Vector{TrajectoryElement}}, options::Dict)
+function PlotFirst(RFdeg::Vector{ComplexF64}, trajectorySet::Vector{<:Vector{<:TrajectoryElement}}, options::Dict)
     # extract first element (presumably only element) of each trajectory
     ky = [s[1].ky for s in trajectorySet]
     kz = [s[1].kz for s in trajectorySet]
@@ -39,7 +39,7 @@ function PlotFirst(RFdeg::Vector{ComplexF64}, trajectorySet::Vector{Vector{Traje
 end
 
 # Show a set of (max e.g. 10) of the trajectories applied
-function PlotTrajectories(trajectorySet::Vector{Vector{TrajectoryElement}})
+function PlotTrajectories(trajectorySet::Vector{<:Vector{<:TrajectoryElement}})
     tl = length(trajectorySet)
     dl = min(tl, 10)
     Main.PyPlot.figure()
@@ -100,7 +100,7 @@ function PlotOriginalJacobian(w₀::Vector{ComplexF64}, w₁::Vector{ComplexF64}
     Main.PyPlot.imshow(jjj)
 end
 
-function PlotBars(RFrad, trajectorySet::Vector{Vector{TrajectoryElement}}, noisesAll::Vector{Float64})
+function PlotBars(RFrad, trajectorySet::Vector{<:Vector{<:TrajectoryElement}}, noisesAll::Vector{Float64})
     ky = [(s)[1].ky for s in trajectorySet]
     rky = maximum(ky) - minimum(ky)
     rky = max(rky, 1.0)

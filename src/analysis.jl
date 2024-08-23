@@ -1,6 +1,6 @@
 
 """
-BLAKJac_analysis!(RFdeg::Vector{ComplexF64}, trajectorySet::Vector{Vector{TrajectoryElement}}, options::Dict, saved_H::Dict=Dict())
+BLAKJac_analysis!(RFdeg::Vector{ComplexF64}, trajectorySet::Vector{<:Vector{<:TrajectoryElement}}, options::Dict, saved_H::Dict=Dict())
 
 BLAKJac_Analysis! predicts noise levels, given an RF pattern and a phase encoding pattern.
 
@@ -129,7 +129,7 @@ function BLAKJacOnT1T2set(T1T2set, sequence, trajectorySet, options, saved_H, nN
 end
 
 """
-    BLAKJacOnSingleT1T2(T1test, T2test, B1test, nNuisances, spgr::BlochSimulators.FISP3D, trajectorySet::Vector{Vector{TrajectoryElement}}, options::Dict)
+    BLAKJacOnSingleT1T2(T1test, T2test, B1test, nNuisances, spgr::BlochSimulators.FISP3D, trajectorySet::Vector{<:Vector{<:TrajectoryElement}}, options::Dict)
 
 Predicts noise levels, information content and B1 coupling factors for a given combination of RF pattern (that is contained with `sequence`) and phase encoding pattern (`trajectorySet`) using a **single pair** of T₁ and T₂ values. 
 """

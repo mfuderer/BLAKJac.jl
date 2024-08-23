@@ -32,7 +32,7 @@ The interface, in full:
 ```julia
 function BLAKJac_analysis!(
     RFdeg::Vector{ComplexF64}, 
-    trajectorySet::Vector{Vector{TrajectoryElement}}, 
+    trajectorySet::Vector{<:Vector{<:TrajectoryElement}}, 
     options::Dict, 
     saved_H::Dict=Dict())
 ```
@@ -64,7 +64,7 @@ The function TrajectorySet(kyVector, kzVector) may be useful before invoking the
 ## Options
 There are lots of option parameters, some of them are deprecated and some have defaults that are very rarely adapted. For that purpose, the following function is available:
 
-BLAKJac_defaults!(trajectorySet::Vector{Vector{TrajectoryElement}}, options::Dict)
+BLAKJac_defaults!(trajectorySet::Vector{<:Vector{<:TrajectoryElement}}, options::Dict)
 
 It does not return anything, but the “!” indicates that options will be modified by it. Note: it only assigns uninitialized options to a default value. Options that are already filled in will be left unmodified. To set all options to default, use
 

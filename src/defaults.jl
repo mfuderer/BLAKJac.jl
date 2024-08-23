@@ -1,7 +1,7 @@
 # Introduced 2022-07-14
 # Serves to fill in meaningful defaults for the options needed for BLAKJac optimization
 """
-    BLAKJac_defaults!(trajectorySet::Vector{Vector{TrajectoryElement}}, options::Dict)
+    BLAKJac_defaults!(trajectorySet::Vector{<:Vector{<:TrajectoryElement}}, options::Dict)
 
 Initializes the elements of the dictionary 'options' (if not already filled in) to meaningful default values. 
     
