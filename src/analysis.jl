@@ -1,16 +1,17 @@
 
 """
-BLAKJac_analysis!(RFdeg::Vector{ComplexF64}, trajectorySet::Vector{<:Vector{<:TrajectoryElement}}, options::Dict, saved_H::Dict=Dict())
+BLAKJac_analysis!(sequence::BlochSimulator, trajectorySet::Vector{<:Vector{<:TrajectoryElement}}, options::Dict, saved_H::Dict=Dict())
 
 BLAKJac_Analysis! predicts noise levels, given an RF pattern and a phase encoding pattern.
 
 # Inputs: 
-RF pattern,   phase-encoding pattern, and a bunch of parameters (see below)
+A sequence object including an RF pattern, phase-encoding pattern, and a bunch of parameters (see below)
 
 # Output:
 - noisesAll   An array of 3 noise values (rho, T1, T2)  
 - ItotAll     Information content (still a very raw metric)
 - b1factorsRMS An array of couplings between (rho, T1, T2) and B1 (and that RMS over the T1T2set); only calculated if handleB1=="sensitivity"
+- CSF_penalty  A penalty for the CSF sensitivity; only calculated if CSF is to be considered
 
 # InOut:
 A dictionary of H matrix arrays (labeled by combination of T1T2-probing index and RF pattern name)
@@ -56,8 +57,8 @@ A dictionary of H matrix arrays (labeled by combination of T1T2-probing index an
 - `useSurrogate`  should be false by default; if true, it uses a polynomial estimate of signal and derivatives, rather than the actual EPG estimate
 - `useSymmetry`   if true, it is assumed that the phase of proton density is very smooth, such that, for BLAKJac analysis, all output can be considerd to be real
 """
-function BLAKJac_analysis!(
-    RFdeg::Vector{<:Complex}, 
+function BLAKJac_analysis!( 
+    sequence::BlochSimulator,
     trajectorySet::Vector{<:Vector{<:TrajectoryElement}}, 
     options::Dict, 
     saved_H::Dict=Dict()
@@ -69,11 +70,8 @@ function BLAKJac_analysis!(
     # Check whether B1 is to be considered as a nuisance parameter
     nNuisances = _calculate_num_nuisance_parameters(options)
 
-    # Assemble SPGR sequence simulator (FISP3D) 
-    sequence = _assemble_FISP3D(options, RFdeg)
-
     # Plot RF train and trajectory (if supported plotting backend is available)
-    _plot_sequence(options, RFdeg, trajectorySet)
+    _plot_sequence(options, sequence.RF_train, trajectorySet)
 
     # Estimate the noise levels, information content and B1 sensitivity factor
     B1_coupling_factors, noise_values, information_content = BLAKJacOnT1T2set(T1T2set, sequence, trajectorySet, options, saved_H, nNuisances)
@@ -82,7 +80,7 @@ function BLAKJac_analysis!(
     CSF_penalty = _calculate_csf_penalty(options, sequence, T1T2set)
 
     # Plot noise levels (if supported plotting backend is available)
-    _plot_noise_levels(options, RFdeg, trajectorySet, noise_values)
+    _plot_noise_levels(options, sequence.RF_train, trajectorySet, noise_values)
 
     return noise_values, information_content, B1_coupling_factors, CSF_penalty
 end

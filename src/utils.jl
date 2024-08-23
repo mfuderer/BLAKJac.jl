@@ -44,9 +44,11 @@ function _plot_noise_spectrum(H, nes2, note, options)
     end
 end
 
-function _assemble_FISP3D(options, RFdeg)
+function _assemble_FISP3D(options)
 
     # TODO: This should be removed form BLAKJac: BLAKJac should work for any simulator and it is not the responsibility of BLAKJac to assemble the sequence)
+
+    RFdeg = complex.(rand(options["nTR"])) 
     
     TR::Float64 = options["TR"]
     TE = TR / 2.01
@@ -63,6 +65,18 @@ function _assemble_FISP3D(options, RFdeg)
     py_undersampling_factor = 1
     spgr = BlochSimulators.FISP3D(RFdeg, TR, TE, maxstate, TI, T_wait, N_repeat, bINV, false, py_undersampling_factor)
     return spgr
+end
+
+function _set_RF_train!(sequence, RFdeg)
+    
+    # Check whether RFdeg has the same element type (e.g. Complex) as what is expected by the sequence object
+    if eltype(RFdeg) != eltype(sequence.RF_train)
+        error("RFdeg and sequence.RF_train must have the same element type")
+    end
+    # Modify the sequence object's RF_train field in-place
+    sequence.RF_train .= RFdeg
+
+    return nothing
 end
 
 function _calculate_csf_penalty(options, sequence, T1T2set)
