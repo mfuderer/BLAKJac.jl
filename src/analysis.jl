@@ -94,8 +94,10 @@ function BLAKJac_analysis!(resource,
     options::Dict, 
     saved_H::Dict=Dict()
     )
+    sequence = _assemble_FISP3D(options)
+    _set_RF_train!(sequence, RFdeg)
 
-    BLAKJac_analysis!(RFdeg, trajectorySet, options, saved_H)
+    BLAKJac_analysis!(sequence, trajectorySet, options, saved_H)
 end
 
 """
@@ -165,6 +167,11 @@ function BLAKJacOnSingleT1T2(T1test, T2test, B1test, nNuisances, spgr::BlochSimu
         nParsX = 4
         nNuisancesX = 0
     end
+    invRegB1 = takeB1asVariable ? 0.0 : sqrt(prevfloat(Inf)) # corretion 2024-06-04. Logic: if B1 is to be co-reconstructed, 
+                                                            # then it is not regularized; if it is to be sensitivity-analyzed, 
+                                                            # it should not influence the estimate of T1T2rho noise, so it is
+                                                            # very heavily ('infinitely') regularized
+    invReg = Diagonal([options["invregval"]; [invRegB1]])
 
     # Calculate local weights (magnetization and derivatives)
     wlocal = _calculate_local_weights(spgr, options, nPars, nTR, nNuisances, T1test, T2test, B1test)
@@ -180,10 +187,11 @@ function BLAKJacOnSingleT1T2(T1test, T2test, B1test, nNuisances, spgr::BlochSimu
     wmat = _analyze_jacobian(nky, nkz, nkyEff, useSym, nPars, nNuisances, nTR, wlocal, trajectorySet, options)
 
     # analyze matrices for all ky
-    sumH, H, Hdiag = _calculate_H_matrices(wmat, takeB1asVariable, nPars, nky, nkz, useSym, nParsX, nkyEff, options)
+    sumH, H, Hdiag = _calculate_H_matrices(wmat, nPars, nky, nkz, useSym, nParsX, nkyEff, invReg, options)
 
     # B1 sensitivity factor
-    b1factors = _calculate_b1_sensitivity(nPars, nkz, nNuisances, nNuisancesX, options)
+    b1factors = _calculate_b1_sensitivity(spgr, wmat, nPars, nkz, nNuisances, nNuisancesX, 
+                                            T1test, T2test, trajectorySet, invReg, options)
 
     # A scaling factor is introduced that should normalize the noise level to 1 in case of Rho-only reconstruction
     # Calculate "Normalized Expected Signal squared" (nes2)
@@ -232,13 +240,7 @@ function _calculate_local_weights(spgr, options, nPars, nTR, nNuisances, T1test,
     return wlocal
 end
 
-function _calculate_H_matrices(wmat, takeB1asVariable, nPars, nky, nkz, useSym, nParsX, nkyEff, options)
-
-    invRegB1 = takeB1asVariable ? 0.0 : sqrt(prevfloat(Inf)) # corretion 2024-06-04. Logic: if B1 is to be co-reconstructed, 
-    # then it is not regularized; if it is to be sensitivity-analyzed, 
-    # it should not influence the estimate of T1T2rho noise, so it is
-    # very heavily ('infinitely') regularized
-    invReg = Diagonal([options["invregval"]; [invRegB1]])
+function _calculate_H_matrices(wmat, nPars, nky, nkz, useSym, nParsX, nkyEff, invReg, options)
 
     # analyze matrices for all ky
     sumH = zeros(ComplexF64, nParsX, nParsX)
@@ -362,7 +364,16 @@ function _calculate_information_content(Hdiag, options, nes2, note, nParsX)
 end
 
 
-function _calculate_b1_sensitivity(nPars, nkz, nNuisances, nNuisancesX, options)
+function _calculate_b1_sensitivity(spgr, wmat, nPars, nkz, nNuisances, nNuisancesX, 
+                                    T1test, T2test, trajectorySet, invReg, options)
+
+    maxMeas = options["maxMeas"]
+    useSym  = options["useSymmetry"]
+    nky     = options["nky"]
+
+    nTR = length(trajectorySet)
+    fit_parameters = (nNuisances > 0) ? (:T₁, :T₂, :B₁) : (:T₁, :T₂)
+    wlocal = zeros(ComplexF64, nTR, nPars + nNuisances)
 
     b1factors = zeros(nPars)
     b1factors2 = zeros(nPars)
@@ -409,7 +420,7 @@ function _calculate_b1_sensitivity(nPars, nkz, nNuisances, nNuisancesX, options)
                 # and we assume the ρT1T2-Jacobian to be rather constant over this B1 region (but we take it halfway
                 # between the two B1 values).
                 b1midway = (B1metric == "multi_point_values") ? (1.0 + b1) / 2.0 : b1
-                parameters = [BlochSimulators.T₁T₂B₁(T1test, T2test, b1midway)]
+                parameters = StructVector([BlochSimulators.T₁T₂B₁(T1test, T2test, b1midway)])
                 m = simulate_magnetization(spgr, parameters)
                 ∂m = simulate_derivatives_finite_difference(fit_parameters, m, spgr, parameters)
                 wlocal[:, 1] = m

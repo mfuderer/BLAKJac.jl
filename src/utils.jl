@@ -86,13 +86,13 @@ function _calculate_csf_penalty(options, sequence, T1T2set)
         # Set T₁ and T₂ values for CSF
         parameters = BlochSimulators.T₁T₂(4.0, 2.0)
         # Simulate the magnetization at echo times for CSF
-        echos_csf = BlochSimulators.simulate_magnetization(cpu, sequence, [parameters])
+        echos_csf = BlochSimulators.simulate_magnetization(sequence, [parameters])
 
         # Simulate for test values corresponding to different tissues as well (and sum?)
         echos_tissue = zero(echos_csf)
         for (index, (T1test, T2test)) in enumerate(T1T2set)
             parameters = BlochSimulators.T₁T₂(T1test, T2test)
-            echos_tissue .+= BlochSimulators.simulate_magnetization(cpu, sequence, [parameters])
+            echos_tissue .+= BlochSimulators.simulate_magnetization(sequence, [parameters])
         end
 
         # Calculate the penalty
@@ -108,7 +108,7 @@ function _calculate_csf_penalty(options, sequence, T1T2set)
                 Main.PyPlot.plot(abs.(echos_csf))
                 for (index, (T1test, T2test)) in enumerate(T1T2set)
                     parameters = BlochSimulators.T₁T₂(T1test, T2test)
-                    echos_tissue_one = BlochSimulators.simulate_magnetization(cpu, sequence, [parameters])
+                    echos_tissue_one = BlochSimulators.simulate_magnetization(sequence, [parameters])
                     Main.PyPlot.plot(abs.(echos_tissue_one))
                 end
                 Main.PyPlot.pause(0.1)
