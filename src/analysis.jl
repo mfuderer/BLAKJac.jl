@@ -185,7 +185,6 @@ function BLAKJacOnSingleT1T2(T1test, T2test, B1test, nNuisances, spgr::BlochSimu
 
     # analyze Jacobian
     wmat = _analyze_jacobian(nky, nkz, nkyEff, useSym, nPars, nNuisances, nTR, wlocal, trajectorySet, options)
-
     # analyze matrices for all ky
     sumH, H, Hdiag = _calculate_H_matrices(wmat, nPars, nky, nkz, useSym, nParsX, nkyEff, invReg, options)
 
@@ -228,7 +227,7 @@ function _calculate_local_weights(spgr, options, nPars, nTR, nNuisances, T1test,
     end
 
     m = simulate_magnetization(spgr, parameters)
-    ∂m = simulate_derivatives_finite_difference(fit_parameters, m, spgr, parameters)
+    ∂m = simulate_derivatives_finite_difference(fit_parameters, m, spgr, parameters, T₁T₂B₁B₀(10^-4, 10^-4, 10^-4, 10^-4))
 
     wlocal[:, 1] = m
     wlocal[:, 2] = ∂m.T₁ .* T1test
@@ -422,7 +421,7 @@ function _calculate_b1_sensitivity(spgr, wmat, nPars, nkz, nNuisances, nNuisance
                 b1midway = (B1metric == "multi_point_values") ? (1.0 + b1) / 2.0 : b1
                 parameters = StructVector([BlochSimulators.T₁T₂B₁(T1test, T2test, b1midway)])
                 m = simulate_magnetization(spgr, parameters)
-                ∂m = simulate_derivatives_finite_difference(fit_parameters, m, spgr, parameters)
+                ∂m = simulate_derivatives_finite_difference(fit_parameters, m, spgr, parameters, T₁T₂B₁B₀(10^-4, 10^-4, 10^-4, 10^-4))
                 wlocal[:, 1] = m
                 wlocal[:, 2] = ∂m.T₁ .* T1test
                 wlocal[:, 3] = ∂m.T₂ .* T2test
